@@ -319,19 +319,19 @@
 
 AI 时代，人人都是高级程序员。无论是代码优化、Bug 修复、功能增强还是文档改进，都欢迎参与。
 
-![webpage](.\hardware\webpage.png)
+![webpage](./hardware/webpage.png)
 
-![HomeAssistant](.\hardware\HomeAssistant.png)
+![HomeAssistant](./hardware/HomeAssistant.png)
 
-![PCB_正面](.\hardware\PCB_正面.png)
+![PCB_正面](./hardware/PCB_正面.png)
 
-![PCB_背面](.\hardware\PCB_背面.png)
+![PCB_背面](./hardware/PCB_背面.png)
 
-![实物](.\hardware\实物.png)
+![实物](./hardware/实物.png)
 
-![实物1](.\hardware\实物1.png)
+![实物1](./hardware/实物1.png)
 
-![历史版本](.\hardware\历史版本.png)
+![历史版本](./hardware/历史版本.png)
 
 ## 致谢
 
