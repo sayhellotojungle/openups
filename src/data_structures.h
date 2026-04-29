@@ -77,6 +77,7 @@ typedef struct {
     uint32_t capacity_remaining;    // 剩余容量 (mAh)
     bool balancing_active;          // 均衡激活状态
     uint8_t balance_mask;           // 均衡掩码 (bit0-4 对应 cell1-5)
+    float temporary_soh;            // 临时SOH，根据不平衡状态动态计算
     
     // 均衡统计
     uint16_t balancing_events_total; // 总均衡次数（高 14bit）

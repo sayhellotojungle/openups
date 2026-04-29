@@ -388,9 +388,11 @@ bool BMS::stopBalancing() {
     return false;
 }
 
-void BMS::evaluateAndExecuteBalancing(const BMS_State& bmsState) {
+void BMS::evaluateAndExecuteBalancing(BMS_State& bmsState) {
     if (!initialized_ || !config_.balancing_enabled) {
         if (initialized_) stopBalancing();
+        bmsState.balancing_active = false;
+        bmsState.balance_mask = 0;
         return;
     }
 
@@ -398,12 +400,8 @@ void BMS::evaluateAndExecuteBalancing(const BMS_State& bmsState) {
     bool is_current_suitable = (bmsState.current >= -5 && bmsState.current <= BALANCING_MAX_CURRENT_MA);
     if (!is_current_suitable) {
         stopBalancing();
-        return;
-    }
-
-    const float MIN_BALANCING_SOC_PERCENT = 75.0f;
-    if (bmsState.soc < MIN_BALANCING_SOC_PERCENT) {
-        stopBalancing();
+        bmsState.balancing_active = false;
+        bmsState.balance_mask = 0;
         return;
     }
 
@@ -416,14 +414,57 @@ void BMS::evaluateAndExecuteBalancing(const BMS_State& bmsState) {
     }
     if (!valid_reading) {
         stopBalancing();
+        bmsState.balancing_active = false;
+        bmsState.balance_mask = 0;
         return;
     }
 
     uint16_t voltage_diff = bmsState.cell_voltage_max - bmsState.cell_voltage_min;
-    if (voltage_diff >= config_.balancing_voltage_diff) {
-        startBalancing(bmsState);
-    } else {
+    if (voltage_diff < config_.balancing_voltage_diff) {
         stopBalancing();
+        bmsState.balancing_active = false;
+        bmsState.balance_mask = 0;
+        return;
+    }
+
+    // 根据压差动态计算最低启动SOC阈值
+    // 压差越大，允许的最低SOC越低（安全优先）
+    float min_balancing_soc;
+    if (voltage_diff >= 200) {
+        min_balancing_soc = 50.0f;
+    } else if (voltage_diff >= 150) {
+        min_balancing_soc = 60.0f;
+    } else if (voltage_diff >= 100) {
+        min_balancing_soc = 65.0f;
+    } else if (voltage_diff >= 50) {
+        min_balancing_soc = 70.0f;
+    } else {
+        min_balancing_soc = 75.0f;
+    }
+
+    if (bmsState.soc < min_balancing_soc) {
+        stopBalancing();
+        bmsState.balancing_active = false;
+        bmsState.balance_mask = 0;
+        return;
+    }
+
+    // 启动均衡并更新状态
+    if (startBalancing(bmsState)) {
+        bmsState.balancing_active = true;
+        // 计算当前均衡掩码
+        uint8_t balance_mask = 0;
+        const uint16_t* cell_voltages = bmsState.cell_voltages;
+        uint16_t avg_voltage = bmsState.cell_voltage_avg;
+        for (uint8_t i = 0; i < config_.cell_count; i++) {
+            if (cell_voltages[i] > avg_voltage + config_.balancing_voltage_diff) {
+                balance_mask |= (1 << i);
+            }
+        }
+        bmsState.balance_mask = balance_mask;
+    } else {
+        bmsState.balancing_active = false;
+        bmsState.balance_mask = 0;
     }
 }
 
@@ -499,25 +540,77 @@ void BMS::compensateSelfDischarge(unsigned long delta_time_ms) {
 float BMS::calculateSOC_Voltage(const BMS_State& bmsState) {
     if (!initialized_ || !bq76920_.isConnected()) return -1.0f;
 
-    uint16_t ref_cell_mv = (bmsState.current > 100) ? bmsState.cell_voltage_max : bmsState.cell_voltage_min;
-    
+    uint16_t ref_cell_mv;
+    if (bmsState.current > 100) {
+        ref_cell_mv = bmsState.cell_voltage_max;  // 充电时：最高电压
+    } else if (bmsState.current < -100) {
+        ref_cell_mv = bmsState.cell_voltage_min;  // 放电时：最低电压
+    } else {
+        ref_cell_mv = bmsState.cell_voltage_avg;  // 静置时：平均电压
+    }
+
     if (ref_cell_mv < 2500 || ref_cell_mv > 4500) return -1.0f;
-    
+
     if (ref_cell_mv <= OCV_SOC_TABLE[OCV_TABLE_SIZE - 1][0]) return 0.0f;
     if (ref_cell_mv >= OCV_SOC_TABLE[0][0]) return 100.0f;
-    
+
     for (int i = 0; i < OCV_TABLE_SIZE - 1; i++) {
         uint16_t v1 = OCV_SOC_TABLE[i][0];
         uint16_t soc1 = OCV_SOC_TABLE[i][1];
         uint16_t v2 = OCV_SOC_TABLE[i+1][0];
         uint16_t soc2 = OCV_SOC_TABLE[i+1][1];
-        
+
         if (ref_cell_mv >= v2 && ref_cell_mv <= v1) {
             float soc = soc2 + (ref_cell_mv - v2) * (soc1 - soc2) / (float)(v1 - v2);
             return constrain(soc, 0.0f, 100.0f);
         }
     }
     return -1.0f;
+}
+
+float BMS::calculateSOC_FromVoltage(uint16_t voltage_mv) {
+    if (voltage_mv < 2500 || voltage_mv > 4500) return -1.0f;
+
+    if (voltage_mv <= OCV_SOC_TABLE[OCV_TABLE_SIZE - 1][0]) return 0.0f;
+    if (voltage_mv >= OCV_SOC_TABLE[0][0]) return 100.0f;
+
+    for (int i = 0; i < OCV_TABLE_SIZE - 1; i++) {
+        uint16_t v1 = OCV_SOC_TABLE[i][0];
+        uint16_t soc1 = OCV_SOC_TABLE[i][1];
+        uint16_t v2 = OCV_SOC_TABLE[i+1][0];
+        uint16_t soc2 = OCV_SOC_TABLE[i+1][1];
+
+        if (voltage_mv >= v2 && voltage_mv <= v1) {
+            float soc = soc2 + (voltage_mv - v2) * (soc1 - soc2) / (float)(v1 - v2);
+            return constrain(soc, 0.0f, 100.0f);
+        }
+    }
+    return -1.0f;
+}
+
+void BMS::updateTemporarySOH(BMS_State& bmsState) {
+    uint16_t voltage_diff = bmsState.cell_voltage_max - bmsState.cell_voltage_min;
+
+    // 压差小于50mV时，不启用临时SOH
+    if (voltage_diff < 50) {
+        bmsState.temporary_soh = stats_.soh;
+        return;
+    }
+
+    float soc_min = calculateSOC_FromVoltage(bmsState.cell_voltage_min);
+    float soc_max = calculateSOC_FromVoltage(bmsState.cell_voltage_max);
+
+    // 电压无效时，使用原始SOH
+    if (soc_min < 0 || soc_max < 0) {
+        bmsState.temporary_soh = stats_.soh;
+        return;
+    }
+
+    float charge_space = 1.0f - (soc_max / 100.0f);
+    float discharge_space = soc_min / 100.0f;
+    float effective_capacity_ratio = charge_space + discharge_space;
+
+    bmsState.temporary_soh = stats_.soh * effective_capacity_ratio;
 }
 
 float BMS::calculateSOC_Coulomb() {
@@ -566,16 +659,22 @@ void BMS::applyPendingConfig() {
 void BMS::updateSOC(BMS_State& bmsState) {
     unsigned long current_time = millis();
     unsigned long delta_ms = current_time - last_soc_update_timestamp_;
-    
+
     if (last_soc_update_timestamp_ > 0) {
         compensateSelfDischarge(delta_ms);
     }
     last_soc_update_timestamp_ = current_time;
-    
+
     // 温度补偿容量
     float q_max = getTemperatureCompensatedCapacity(bmsState.temperature);
     if (q_max <= 0) q_max = (float)config_.nominal_capacity_mAh;
-    
+
+    // 计算临时SOH并应用
+    updateTemporarySOH(bmsState);
+    if (stats_.soh > 0) {
+        q_max = q_max * (bmsState.temporary_soh / stats_.soh);
+    }
+
     float stable_current_threshold = config_.nominal_capacity_mAh / 20.0f;
     
     // ========== SOC 初始化 ==========

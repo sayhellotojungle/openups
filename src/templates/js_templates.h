@@ -97,7 +97,7 @@ var h2='';for(var i=0;i<11;i++){var v=r2[i]||0;h2+='<div class="card"><div class
 $('r24').innerHTML=h2;
 var a7=['0x00','0x01','0x04','0x05','0x06','0x07','0x08','0x09','0x0A','0x0B','0x50','0x51'];
 var n7=['SYS_STAT','CELLBAL1','SYS_CTRL1','SYS_CTRL2','PROTECT1','PROTECT2','PROTECT3','OV_TRIP','UV_TRIP','CC_CFG','GAIN_uV','OFFSET_mV'];
-var h7='';for(var i=0;i<12;i++){var v=r7[i]||0,bt='',hx='0x'+v.toString(16).toUpperCase().padStart(2,'0');for(var j=7;j>=0;j--)bt+=(v>>j&1);h7+='<div class="card"><div class="card-t" style="font-size:13px">'+a7[i]+' '+n7[i]+'</div><div style="color:#1677ff;font-weight:700;font-size:16px">'+hx+' <span style="color:#bbb;font-size:10px;font-family:monospace">'+bt+'</span></div>'+pB7(i,v)+'</div>'}
+var h7='';for(var i=0;i<12;i++){var v=r7[i]||0,bt='',hx='0x'+v.toString(16).toUpperCase().padStart(2,'0');for(var j=7;j>=0;j--)bt+=(v>>j&1);h7+='<div class="card"><div class="card-t" style="font-size:13px">'+a7[i]+' '+n7[i]+'</div><div style="color:#1677ff;font-weight:700;font-size:16px">'+hx+' <span style="color:#bbb;font-size:10px;font-family:monospace">'+bt+'</span></div>'+pB7(i,v,r7)+'</div>'}
 $('r76').innerHTML=h7;
 }
 function pB2(i,v){
@@ -115,18 +115,18 @@ case 8:r+=sc+'充电电压：'+((v>>4)&1023)*16+'mV</div>';break;
 case 9:r+=sc+'放电电流：'+((v>>9)&63)*512+'mA</div>';break;
 case 10:r+=sc+'输入电流：'+((v>>7)&63)*128+'mA</div>';break;
 }return r;}
-function pB7(i,v){
+function pB7(i,v,r7){
 var r='',st='<div style="font-size:11px;margin-top:4px;',sb=st+'color:#888">',sg=st+'color:#52c41a">',sr=st+'color:#f5222d;font-weight:600">',sy=st+'color:#d48806;font-weight:600">',sw=st+'color:#d48806">';
 switch(i){
 case 0:r+=sg+'CC 就绪：'+(v>>7&1?'新数据':'无')+'</div>'+st+'color:#888">芯片故障：'+(v>>5&1?'错误':'正常')+'</div>'+st+'color:#888">UV: '+(v>>3&1?'触发':'正常')+'</div>'+st+'color:#888">OV: '+(v>>2&1?'触发':'正常')+'</div>'+st+'color:#888">SCD: '+(v>>1&1?'触发':'正常')+'</div>'+st+'color:#888">OCD: '+(v&1?'触发':'正常')+'</div>';break;
 case 1:r+=st+'color:#888">均衡状态:</div>';for(var j=0;j<5;j++)r+=sw+'Cell'+(j+1)+': '+(((v>>j)&1)?'均衡中':'关闭')+'</div>';break;
 case 2:r+=st+'color:#888">负载检测：'+(v>>7&1?'有':'无')+'</div>'+sb+'ADC: '+(v>>4&1?'使能':'禁用')+'</div>';break;
 case 3:r+=sg+'放电 MOS: '+((v>>1)&1?'开启':'关闭')+'</div>'+sg+'充电 MOS: '+(v&1?'开启':'关闭')+'</div>';break;
-case 4:var rs=(v>>7)&1,sd=['70us','100us','200us','400us'],sc=v&7;r+=sg+'量程：'+(rs?'高 (x2)':'低')+'</div>'+sb+'短路延时：'+sd[(v>>3)&3]+'</div>'+sb+'短路阈值：~'+(rs?(44+sc*22):(22+sc*11))+'mV</div>';break;
-case 5:r+=sb+'过流延时：~'+(8<<((v>>4)&7))+'ms</div>'+sb+'过流阈值：~'+(8+((v&15)*2.8)).toFixed(1)+'mV</div>';break;
+case 4:var rs=(v>>7)&1,sd=['70us','100us','200us','400us'],sc=v&7,scdL=[22,33,44,56,67,78,89,100],scdH=[44,67,89,111,133,155,178,200],scdMv=rs?scdH[sc]:scdL[sc];r+=sg+'量程：'+(rs?'高 (x2)':'低')+'</div>'+sb+'短路延时：'+sd[(v>>3)&3]+'</div>'+sb+'短路阈值：'+scdMv*200+' mA ('+scdMv+' mV)</div>';break;
+case 5:var p1=r7[4]||0,rs2=(p1>>7)&1,ocd=v&0x0F,ocdL=[8,11,14,17,19,22,25,28,31,33,36,39,42,44,47,50],ocdH=[17,22,28,33,39,44,50,56,61,67,72,78,83,89,94,100],ocdMv=rs2?ocdH[ocd]:ocdL[ocd];r+=sb+'过流延时：~'+(8<<((v>>4)&7))+'ms</div>'+sb+'过流阈值：'+ocdMv*200+' mA ('+ocdMv+' mV)</div>';break;
 case 6:r+=sb+'欠压延时：'+[1,4,8,16][(v>>6)&3]+'s</div>'+sb+'过压延时：'+[1,2,4,8][(v>>4)&3]+'s</div>';break;
-case 7:r+=sr+'OV 阈值：0x'+(0x2008|(v<<4)).toString(16).toUpperCase()+'</div>';break;
-case 8:r+=sy+'UV 阈值：0x'+(0x1000|(v<<4)).toString(16).toUpperCase()+'</div>';break;
+case 7:var g7=r7[10]||0,o7=r7[11]||0,gUv=365+g7,oS=o7>127?o7-256:o7,ovAdc=(v<<4)|0x2008,ovMv=(ovAdc*gUv)/1000+oS;r+=sr+'OV 阈值：'+ovMv.toFixed(1)+' mV (ADC:0x'+ovAdc.toString(16).toUpperCase()+')</div>';break;
+case 8:var g8=r7[10]||0,o8=r7[11]||0,gU8=365+g8,oS8=o8>127?o8-256:o8,uvAdc=(v<<4)|0x1000,uvMv=(uvAdc*gU8)/1000+oS8;r+=sy+'UV 阈值：'+uvMv.toFixed(1)+' mV (ADC:0x'+uvAdc.toString(16).toUpperCase()+')</div>';break;
 case 9:var cc=v&0x3F;r+=sb+'CC 配置：0x'+cc.toString(16).toUpperCase()+' '+(cc===0x19?'正确':'异常')+'</div>';break;
 case 10:var g=v+365;r+=sb+'增益：'+g+' ('+(g/1000).toFixed(3)+' mV/LSB)</div>';break;
 case 11:r+=sb+'偏移：'+v+' mV</div>';break;

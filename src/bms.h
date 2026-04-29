@@ -155,7 +155,7 @@ public:
     void updateSOC(BMS_State& bmsState);
     void updateFaultLogic(BMS_State& bmsState);
     void checkCriticalFaults(BMS_State& bmsState);
-    void evaluateAndExecuteBalancing(const BMS_State& bmsState);
+    void evaluateAndExecuteBalancing(BMS_State& bmsState);
     bool updateBasicInfo(BMS_State& bmsState);
     bool validateConfig(const BMS_Config_t& config);
     
@@ -163,9 +163,11 @@ public:
     void handleCommunicationLoss(BMS_State& bmsState);
     
     float calculateSOC_Voltage(const BMS_State& bmsState);
+    float calculateSOC_FromVoltage(uint16_t voltage_mv);
     float calculateSOC_Coulomb();
     float getAvailableCapacity() const;
     float getTemperatureCompensatedCapacity(float temperature) const;
+    void updateTemporarySOH(BMS_State& bmsState);
     
     bool processCoulombCounterData();
     void compensateSelfDischarge(unsigned long delta_time_ms);

@@ -1035,8 +1035,6 @@ void SystemManagement::checkBQ24780sRegisters() {
 
     // 检查 DISCHARGE_CURRENT vs max_discharge_current
     int reg_discharge = Utils::parseBQ24780sDischargeCurrent(regs[9]);
-    Serial.printf_P(PSTR("[RegCheck] BQ24780S DISCHARGE: raw=0x%04X, parsed=%d mA, config=%d mA\n"),
-        regs[9], reg_discharge, config->max_discharge_current);
     if (reg_discharge > 0) {
         float tolerance = config->max_discharge_current * 0.05f;
         if (abs(reg_discharge - config->max_discharge_current) > tolerance) {
@@ -1046,8 +1044,6 @@ void SystemManagement::checkBQ24780sRegisters() {
 
     // 检查 INPUT_CURRENT vs over_current_threshold
     int reg_input = Utils::parseBQ24780sInputCurrent(regs[10]);
-    Serial.printf_P(PSTR("[RegCheck] BQ24780S INPUT: raw=0x%04X, parsed=%d mA, config=%d mA\n"),
-        regs[10], reg_input, config->over_current_threshold);
     if (reg_input > 0) {
         float tolerance = config->over_current_threshold * 0.05f;
         if (abs(reg_input - config->over_current_threshold) > tolerance) {
@@ -1095,8 +1091,6 @@ void SystemManagement::checkBQ76920Registers() {
 
     // 检查 PROTECT1 (SCD) vs short_circuit_threshold
     int reg_scd_ma = Utils::parseBQ76920Protect1(regs[4]);
-    Serial.printf_P(PSTR("[RegCheck] BQ76920 SCD: raw=0x%02X, parsed=%d mA, config=%d mA\n"),
-        regs[4], reg_scd_ma, config->short_circuit_threshold);
     if (reg_scd_ma > 0 && config->short_circuit_threshold > 0) {
         float tolerance = config->short_circuit_threshold * 0.05f;
         if (abs(reg_scd_ma - config->short_circuit_threshold) > tolerance) {
@@ -1106,8 +1100,6 @@ void SystemManagement::checkBQ76920Registers() {
 
     // 检查 PROTECT2 (OCD) vs max_discharge_current
     int reg_ocd_ma = Utils::parseBQ76920Protect2(regs[5], regs[4]);
-    Serial.printf_P(PSTR("[RegCheck] BQ76920 OCD: raw=0x%02X, parsed=%d mA, config=%d mA\n"),
-        regs[5], reg_ocd_ma, config->max_discharge_current);
     if (reg_ocd_ma > 0 && config->max_discharge_current > 0) {
         float tolerance = config->max_discharge_current * 0.05f;
         if (abs(reg_ocd_ma - config->max_discharge_current) > tolerance) {
@@ -1119,8 +1111,6 @@ void SystemManagement::checkBQ76920Registers() {
     uint8_t default_gain = 0x10;
     uint8_t default_offset = 0x00;
     float reg_ov = Utils::parseBQ76920OvTrip(regs[7], default_gain, default_offset);
-    Serial.printf_P(PSTR("[RegCheck] BQ76920 OV: raw=0x%02X, parsed=%.1f mV, config=%d mV\n"),
-        regs[7], reg_ov, config->cell_ov_threshold);
     if (reg_ov > 0 && config->cell_ov_threshold > 0) {
         float tolerance = config->cell_ov_threshold * 0.01f;
         if (abs(reg_ov - config->cell_ov_threshold) > tolerance) {
@@ -1130,8 +1120,6 @@ void SystemManagement::checkBQ76920Registers() {
 
     // 检查 UV_TRIP vs cell_uv_threshold
     float reg_uv = Utils::parseBQ76920UvTrip(regs[8], default_gain, default_offset);
-    Serial.printf_P(PSTR("[RegCheck] BQ76920 UV: raw=0x%02X, parsed=%.1f mV, config=%d mV\n"),
-        regs[8], reg_uv, config->cell_uv_threshold);
     if (reg_uv > 0 && config->cell_uv_threshold > 0) {
         float tolerance = config->cell_uv_threshold * 0.01f;
         if (abs(reg_uv - config->cell_uv_threshold) > tolerance) {
